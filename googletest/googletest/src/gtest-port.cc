@@ -639,11 +639,17 @@ class ThreadLocalRegistryImpl {
     // We need to pass a valid thread ID pointer into CreateThread for it
     // to work correctly under Win98.
     DWORD watcher_thread_id;
+
+    static ::std::map<DWORD, ::std::shared_ptr<ThreadIdAndHandle>> ThreadHandles;
+    ThreadHandles[thread_id] =
+      ::std::make_shared<ThreadIdAndHandle>(thread_id, thread);
+
     HANDLE watcher_thread = ::CreateThread(
         nullptr,  // Default security.
         0,        // Default stack size
         &ThreadLocalRegistryImpl::WatcherThreadFunc,
-        reinterpret_cast<LPVOID>(new ThreadIdAndHandle(thread_id, thread)),
+        //reinterpret_cast<LPVOID>(new ThreadIdAndHandle(thread_id, thread)),
+        ThreadHandles[thread_id].get(),
         CREATE_SUSPENDED, &watcher_thread_id);
     GTEST_CHECK_(watcher_thread != nullptr);
     // Give the watcher thread the same priority as ours to avoid being
@@ -671,10 +677,10 @@ class ThreadLocalRegistryImpl {
   static ThreadIdToThreadLocals* GetThreadLocalsMapLocked() {
     mutex_.AssertHeld();
 #ifdef _MSC_VER
-    MemoryIsNotDeallocated memory_is_not_deallocated;
+    //MemoryIsNotDeallocated memory_is_not_deallocated;
 #endif  // _MSC_VER
-    static ThreadIdToThreadLocals* map = new ThreadIdToThreadLocals();
-    return map;
+    static auto map = ::std::make_shared<ThreadIdToThreadLocals>();
+    return map.get();
   }
 
   // Protects access to GetThreadLocalsMapLocked() and its return value.
